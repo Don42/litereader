@@ -52,6 +52,7 @@ pub trait Sqlite {
     fn get_page_size(&self) -> u32;
     fn get_write_version(&self) -> WriteVersion;
     fn get_read_version(&self) -> ReadVersion;
+    fn get_reserved_space(&self) -> u8;
 }
 
 impl Sqlite for SqliteHeader {
@@ -102,11 +103,14 @@ impl Sqlite for SqliteHeader {
             _ => panic!("Unknown WriteVersion"),
         }
     }
+
+    fn get_reserved_space(&self) -> u8 {
+        self.hdr[20]
+    }
 }
 
 #[cfg(test)]
 mod tests {
     #[test]
-    fn it_works() {
-    }
+    fn it_works() {}
 }
