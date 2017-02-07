@@ -7,7 +7,7 @@ authors = ["Marco 'don' Kaulea <DonMarco42@gmail.com>"]
 byteorder = "1.0.0"
 
 [lib]
-name = "litereader"
+name = "liblitereader"
 path = "src/lib.rs"
 
 [[bin]]
