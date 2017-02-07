@@ -30,11 +30,28 @@ impl std::fmt::Display for WriteVersion {
     }
 }
 
+pub enum ReadVersion {
+    Legacy,
+    WAL,
+}
+
+impl std::fmt::Display for ReadVersion {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f,
+               "{}",
+               match self {
+                   &ReadVersion::Legacy => "Legacy",
+                   &ReadVersion::WAL => "WAL",
+               })
+    }
+}
+
 pub trait Sqlite {
     fn new(path: &str) -> SqliteHeader;
     fn get_magic_string(&self) -> &str;
     fn get_page_size(&self) -> u32;
     fn get_write_version(&self) -> WriteVersion;
+    fn get_read_version(&self) -> ReadVersion;
 }
 
 impl Sqlite for SqliteHeader {
@@ -74,6 +91,14 @@ impl Sqlite for SqliteHeader {
         match self.hdr[18] {
             1 => WriteVersion::Legacy,
             2 => WriteVersion::WAL,
+            _ => panic!("Unknown WriteVersion"),
+        }
+    }
+
+    fn get_read_version(&self) -> ReadVersion {
+        match self.hdr[19] {
+            1 => ReadVersion::Legacy,
+            2 => ReadVersion::WAL,
             _ => panic!("Unknown WriteVersion"),
         }
     }
