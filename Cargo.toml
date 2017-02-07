@@ -1,0 +1,15 @@
+[package]
+name = "litereader"
+version = "0.1.0"
+authors = ["Marco 'don' Kaulea <DonMarco42@gmail.com>"]
+
+[dependencies]
+byteorder = "1.0.0"
+
+[lib]
+name = "litereader"
+path = "src/lib.rs"
+
+[[bin]]
+name = "litereader"
+path = "src/bin.rs"
