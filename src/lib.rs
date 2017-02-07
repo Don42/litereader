@@ -67,7 +67,11 @@ impl Sqlite for SqliteHeader {
         };
 
         let mut buffer = Vec::<u8>::with_capacity(100);
-        let _ = file.take(100).read_to_end(&mut buffer);
+        let count = match file.take(100).read_to_end(&mut buffer) {
+            Ok(n) => n,
+            Err(why) => panic!("couldn't read header {}", why.description()),
+        };
+        assert_eq!(count, 100);
         SqliteHeader { hdr: buffer.clone() }
     }
 
