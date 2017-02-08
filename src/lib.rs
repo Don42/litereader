@@ -8,7 +8,15 @@ use std::io::Cursor;
 
 use byteorder::{BigEndian, ReadBytesExt};
 
+const HEADER_STRING: &'static str = "SQLite format 3\0";
 const PAGE_SIZE_MAX: u32 = 65536;
+
+
+pub trait Sqlite {
+    fn from_file(path: &str) -> SqliteHeader;
+    fn is_valid(&self) -> bool;
+}
+
 
 pub struct SqliteHeader {
     hdr: Vec<u8>,
@@ -16,13 +24,21 @@ pub struct SqliteHeader {
     pub page_size: u32,
     pub read_version: ReadVersion,
     pub write_version: WriteVersion,
-	pub reserved_space: u8,
+    pub reserved_space: u8,
 }
+
 
 pub enum WriteVersion {
     Legacy,
     WAL,
 }
+
+
+pub enum ReadVersion {
+    Legacy,
+    WAL,
+}
+
 
 impl std::fmt::Display for WriteVersion {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -35,10 +51,6 @@ impl std::fmt::Display for WriteVersion {
     }
 }
 
-pub enum ReadVersion {
-    Legacy,
-    WAL,
-}
 
 impl std::fmt::Display for ReadVersion {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -51,9 +63,6 @@ impl std::fmt::Display for ReadVersion {
     }
 }
 
-pub trait Sqlite {
-    fn from_file(path: &str) -> SqliteHeader;
-}
 
 impl std::fmt::Display for SqliteHeader {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -62,14 +71,17 @@ impl std::fmt::Display for SqliteHeader {
 Read Version: {}
 Write Version: {}
 Reserved Space: {}
+Valid: {}
 ",
 		self.page_size,
 		self.read_version,
 		self.write_version,
 		self.reserved_space,
+		self.is_valid(),
 		)
-	}
+    }
 }
+
 
 impl Sqlite for SqliteHeader {
     fn from_file(path: &str) -> SqliteHeader {
@@ -90,17 +102,22 @@ impl Sqlite for SqliteHeader {
         assert_eq!(count, 100);
         // Parse everything here
         let magic = std::str::from_utf8(&buffer[0..16]).unwrap();
-        assert_eq!(magic, "SQLite format 3\0");
+        assert_eq!(magic, HEADER_STRING);
         SqliteHeader {
             hdr: buffer.clone(),
             magic_string: magic.to_string(),
             page_size: get_page_size(&buffer),
             read_version: get_read_version(&buffer),
             write_version: get_write_version(&buffer),
-			reserved_space: buffer[20],
+            reserved_space: buffer[20],
         }
     }
+
+    fn is_valid(&self) -> bool {
+        self.magic_string == HEADER_STRING
+    }
 }
+
 
 fn get_page_size(buffer: &[u8]) -> u32 {
     let mut cur = Cursor::new(&buffer[16..18]);
@@ -113,6 +130,7 @@ fn get_page_size(buffer: &[u8]) -> u32 {
     }
 }
 
+
 fn get_write_version(buffer: &[u8]) -> WriteVersion {
     match buffer[18] {
         1 => WriteVersion::Legacy,
@@ -120,6 +138,7 @@ fn get_write_version(buffer: &[u8]) -> WriteVersion {
         _ => panic!("Unknown WriteVersion"),
     }
 }
+
 
 fn get_read_version(buffer: &[u8]) -> ReadVersion {
     match buffer[19] {
