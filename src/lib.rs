@@ -12,6 +12,11 @@ const PAGE_SIZE_MAX: u32 = 65536;
 
 pub struct SqliteHeader {
     hdr: Vec<u8>,
+    pub magic_string: String,
+    pub page_size: u32,
+    pub read_version: ReadVersion,
+    pub write_version: WriteVersion,
+	pub reserved_space: u8,
 }
 
 pub enum WriteVersion {
@@ -47,16 +52,27 @@ impl std::fmt::Display for ReadVersion {
 }
 
 pub trait Sqlite {
-    fn new(path: &str) -> SqliteHeader;
-    fn get_magic_string(&self) -> &str;
-    fn get_page_size(&self) -> u32;
-    fn get_write_version(&self) -> WriteVersion;
-    fn get_read_version(&self) -> ReadVersion;
-    fn get_reserved_space(&self) -> u8;
+    fn from_file(path: &str) -> SqliteHeader;
+}
+
+impl std::fmt::Display for SqliteHeader {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f,
+"Page Size: {}
+Read Version: {}
+Write Version: {}
+Reserved Space: {}
+",
+		self.page_size,
+		self.read_version,
+		self.write_version,
+		self.reserved_space,
+		)
+	}
 }
 
 impl Sqlite for SqliteHeader {
-    fn new(path: &str) -> SqliteHeader {
+    fn from_file(path: &str) -> SqliteHeader {
         let path = Path::new(path);
 
         let file = match File::open(&path) {
@@ -72,46 +88,47 @@ impl Sqlite for SqliteHeader {
             Err(why) => panic!("couldn't read header {}", why.description()),
         };
         assert_eq!(count, 100);
-        SqliteHeader { hdr: buffer.clone() }
-    }
-
-    fn get_magic_string(&self) -> &str {
-        let magic = std::str::from_utf8(&self.hdr[0..16]).unwrap();
+        // Parse everything here
+        let magic = std::str::from_utf8(&buffer[0..16]).unwrap();
         assert_eq!(magic, "SQLite format 3\0");
-        magic
-    }
-
-    fn get_page_size(&self) -> u32 {
-        let mut cur = Cursor::new(&self.hdr[16..18]);
-        let size = cur.read_u16::<BigEndian>().unwrap();
-        assert!(size.is_power_of_two());
-        if size == 1 {
-            PAGE_SIZE_MAX
-        } else {
-            size as u32
+        SqliteHeader {
+            hdr: buffer.clone(),
+            magic_string: magic.to_string(),
+            page_size: get_page_size(&buffer),
+            read_version: get_read_version(&buffer),
+            write_version: get_write_version(&buffer),
+			reserved_space: buffer[20],
         }
-    }
-
-    fn get_write_version(&self) -> WriteVersion {
-        match self.hdr[18] {
-            1 => WriteVersion::Legacy,
-            2 => WriteVersion::WAL,
-            _ => panic!("Unknown WriteVersion"),
-        }
-    }
-
-    fn get_read_version(&self) -> ReadVersion {
-        match self.hdr[19] {
-            1 => ReadVersion::Legacy,
-            2 => ReadVersion::WAL,
-            _ => panic!("Unknown WriteVersion"),
-        }
-    }
-
-    fn get_reserved_space(&self) -> u8 {
-        self.hdr[20]
     }
 }
+
+fn get_page_size(buffer: &[u8]) -> u32 {
+    let mut cur = Cursor::new(&buffer[16..18]);
+    let size = cur.read_u16::<BigEndian>().unwrap();
+    assert!(size.is_power_of_two());
+    if size == 1 {
+        PAGE_SIZE_MAX
+    } else {
+        size as u32
+    }
+}
+
+fn get_write_version(buffer: &[u8]) -> WriteVersion {
+    match buffer[18] {
+        1 => WriteVersion::Legacy,
+        2 => WriteVersion::WAL,
+        _ => panic!("Unknown WriteVersion"),
+    }
+}
+
+fn get_read_version(buffer: &[u8]) -> ReadVersion {
+    match buffer[19] {
+        1 => ReadVersion::Legacy,
+        2 => ReadVersion::WAL,
+        _ => panic!("Unknown WriteVersion"),
+    }
+}
+
 
 #[cfg(test)]
 mod tests {
