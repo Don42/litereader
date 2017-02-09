@@ -25,6 +25,38 @@ pub struct SqliteHeader {
     pub read_version: ReadVersion,
     pub write_version: WriteVersion,
     pub reserved_space: u8,
+    pub max_embedded_payload_fraction: u8,
+    pub min_embedded_payload_fraction: u8,
+    pub leaf_payload_fraction: u8,
+    pub file_change_counter: u32,
+    pub database_size: u32,
+    pub freelist_trunk_page: u32,
+    pub freelist_count: u32,
+    pub schema_cookie: u32,
+    pub schema_format: SchemaFormat,
+    pub default_page_cache_size: u32,
+    pub largest_root_page: u32,
+    pub text_encoding: TextEncoding,
+    pub user_version: u32,
+    pub incremental_vacuum_mode: bool,
+    pub application_id: u32,
+    pub reserved_area: [u8; 20],
+    pub version_valid_for: u32,
+    pub sqlite_version_number: u32,
+}
+
+pub enum TextEncoding {
+    UTF8,
+    UTF16le,
+    UTF16be,
+}
+
+
+pub enum SchemaFormat {
+    Format1,
+    Format2,
+    Format3,
+    Format4,
 }
 
 
@@ -40,6 +72,31 @@ pub enum ReadVersion {
 }
 
 
+impl std::fmt::Display for TextEncoding {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f,
+               "{}",
+               match self {
+                   &TextEncoding::UTF8 => "UTF-8",
+                   &TextEncoding::UTF16le => "UTF-16le",
+                   &TextEncoding::UTF16be => "UTF-16be",
+               })
+    }
+}
+
+impl std::fmt::Display for SchemaFormat {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f,
+               "{}",
+               match self {
+                   &SchemaFormat::Format1 => "1",
+                   &SchemaFormat::Format2 => "2",
+                   &SchemaFormat::Format3 => "3",
+                   &SchemaFormat::Format4 => "4",
+               })
+    }
+}
+
 impl std::fmt::Display for WriteVersion {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f,
@@ -50,7 +107,6 @@ impl std::fmt::Display for WriteVersion {
                })
     }
 }
-
 
 impl std::fmt::Display for ReadVersion {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -71,12 +127,46 @@ impl std::fmt::Display for SqliteHeader {
 Read Version: {}
 Write Version: {}
 Reserved Space: {}
+Max Embedded Payload Fraction: {}
+Min Embedded Payload Fraction: {}
+Leaf Payload Fration: {}
+File Change Counter: {}
+Database Size: {}
+Freelist Trunk Page: {}
+Freelist Count: {}
+Schema Cookie: {}
+Schema Format Number: {}
+Default Page Cache Size: {}
+Largest Root Page: {}
+Text Encoding: {}
+User Version: {}
+Incremental Vacuum Mode: {}
+Application ID: {}
+Version Valid For: {}
+SQLite Version Number: {}
 Valid: {}
 ",
 		self.page_size,
 		self.read_version,
 		self.write_version,
 		self.reserved_space,
+        self.max_embedded_payload_fraction,
+        self.min_embedded_payload_fraction,
+        self.leaf_payload_fraction,
+        self.file_change_counter,
+        self.database_size,
+        self.freelist_trunk_page,
+        self.freelist_count,
+        self.schema_cookie,
+        self.schema_format,
+        self.default_page_cache_size,
+        self.largest_root_page,
+        self.text_encoding,
+        self.user_version,
+        self.incremental_vacuum_mode,
+        self.application_id,
+        self.version_valid_for,
+        self.sqlite_version_number,
 		self.is_valid(),
 		)
     }
@@ -103,6 +193,7 @@ impl Sqlite for SqliteHeader {
         // Parse everything here
         let magic = std::str::from_utf8(&buffer[0..16]).unwrap();
         assert_eq!(magic, HEADER_STRING);
+        let mut cur = Cursor::new(&buffer[24..]);
         SqliteHeader {
             hdr: buffer.clone(),
             magic_string: magic.to_string(),
@@ -110,11 +201,49 @@ impl Sqlite for SqliteHeader {
             read_version: get_read_version(&buffer),
             write_version: get_write_version(&buffer),
             reserved_space: buffer[20],
+            max_embedded_payload_fraction: buffer[21],
+            min_embedded_payload_fraction: buffer[22],
+            leaf_payload_fraction: buffer[23],
+            file_change_counter: cur.read_u32::<BigEndian>().unwrap(),
+            database_size: cur.read_u32::<BigEndian>().unwrap(),
+            freelist_trunk_page: cur.read_u32::<BigEndian>().unwrap(),
+            freelist_count: cur.read_u32::<BigEndian>().unwrap(),
+            schema_cookie: cur.read_u32::<BigEndian>().unwrap(),
+            schema_format: match cur.read_u32::<BigEndian>().unwrap() {
+                1 => SchemaFormat::Format1,
+                2 => SchemaFormat::Format2,
+                3 => SchemaFormat::Format3,
+                4 => SchemaFormat::Format4,
+                x => panic!("Unknown SchemaFormat {}", x),
+            },
+            default_page_cache_size: cur.read_u32::<BigEndian>().unwrap(),
+            largest_root_page: cur.read_u32::<BigEndian>().unwrap(),
+            text_encoding: match cur.read_u32::<BigEndian>().unwrap() {
+                1 => TextEncoding::UTF8,
+                2 => TextEncoding::UTF16le,
+                3 => TextEncoding::UTF16be,
+                x => panic!("Unknown TextEncoding {}", x),
+            },
+            user_version: cur.read_u32::<BigEndian>().unwrap(),
+            incremental_vacuum_mode: match cur.read_u32::<BigEndian>().unwrap() {
+                0 => false,
+                1 => true,
+                x => panic!("Unknwon incremental vacuum option: {}", x),
+            },
+            application_id: cur.read_u32::<BigEndian>().unwrap(),
+            reserved_area: {
+                let mut reserved_buffer = [0; 20];
+                cur.read_exact(&mut reserved_buffer).unwrap();
+                reserved_buffer
+            },
+            version_valid_for: cur.read_u32::<BigEndian>().unwrap(),
+            sqlite_version_number: cur.read_u32::<BigEndian>().unwrap(),
         }
     }
 
     fn is_valid(&self) -> bool {
-        self.magic_string == HEADER_STRING
+        self.magic_string == HEADER_STRING && self.max_embedded_payload_fraction == 64 &&
+        self.min_embedded_payload_fraction == 32
     }
 }
 
