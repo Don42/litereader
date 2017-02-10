@@ -1,5 +1,7 @@
 extern crate byteorder;
 
+mod enums;
+
 use std::fs::File;
 use std::io::prelude::Read;
 use std::path::Path;
@@ -7,6 +9,8 @@ use std::error::Error;
 use std::io::Cursor;
 
 use byteorder::{BigEndian, ReadBytesExt};
+
+use enums::{ReadVersion, WriteVersion, TextEncoding, SchemaFormat};
 
 const HEADER_STRING: &'static str = "SQLite format 3\0";
 const PAGE_SIZE_MAX: u32 = 65536;
@@ -44,81 +48,6 @@ pub struct SqliteHeader {
     pub version_valid_for: u32,
     pub sqlite_version_number: u32,
 }
-
-pub enum TextEncoding {
-    UTF8,
-    UTF16le,
-    UTF16be,
-}
-
-
-pub enum SchemaFormat {
-    Format1,
-    Format2,
-    Format3,
-    Format4,
-}
-
-
-pub enum WriteVersion {
-    Legacy,
-    WAL,
-}
-
-
-pub enum ReadVersion {
-    Legacy,
-    WAL,
-}
-
-
-impl std::fmt::Display for TextEncoding {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f,
-               "{}",
-               match self {
-                   &TextEncoding::UTF8 => "UTF-8",
-                   &TextEncoding::UTF16le => "UTF-16le",
-                   &TextEncoding::UTF16be => "UTF-16be",
-               })
-    }
-}
-
-impl std::fmt::Display for SchemaFormat {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f,
-               "{}",
-               match self {
-                   &SchemaFormat::Format1 => "1",
-                   &SchemaFormat::Format2 => "2",
-                   &SchemaFormat::Format3 => "3",
-                   &SchemaFormat::Format4 => "4",
-               })
-    }
-}
-
-impl std::fmt::Display for WriteVersion {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f,
-               "{}",
-               match self {
-                   &WriteVersion::Legacy => "Legacy",
-                   &WriteVersion::WAL => "WAL",
-               })
-    }
-}
-
-impl std::fmt::Display for ReadVersion {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f,
-               "{}",
-               match self {
-                   &ReadVersion::Legacy => "Legacy",
-                   &ReadVersion::WAL => "WAL",
-               })
-    }
-}
-
 
 impl std::fmt::Display for SqliteHeader {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
