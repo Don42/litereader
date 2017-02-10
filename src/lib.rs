@@ -19,6 +19,7 @@ const PAGE_SIZE_MAX: u32 = 65536;
 
 pub trait Sqlite {
     fn from_file(path: &str) -> SqliteHeader;
+    fn from_vec(buffer: Vec<u8>) -> SqliteHeader;
     fn is_valid(&self) -> bool;
 }
 
@@ -59,7 +60,7 @@ Write Version: {}
 Reserved Space: {}
 Max Embedded Payload Fraction: {}
 Min Embedded Payload Fraction: {}
-Leaf Payload Fration: {}
+Leaf Payload Fraction: {}
 File Change Counter: {}
 Database Size: {}
 Freelist Trunk Page: {}
@@ -120,6 +121,10 @@ impl Sqlite for SqliteHeader {
             Err(why) => panic!("couldn't read header {}", why.description()),
         };
         assert_eq!(count, 100);
+        SqliteHeader::from_vec(buffer)
+    }
+
+    fn from_vec(buffer: Vec<u8>) -> SqliteHeader {
         // Parse everything here
         let magic = std::str::from_utf8(&buffer[0..16]).unwrap();
         assert_eq!(magic, HEADER_STRING);
