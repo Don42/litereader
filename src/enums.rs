@@ -64,6 +64,7 @@ impl std::fmt::Display for SchemaFormat {
 }
 
 
+#[derive(Debug)]
 pub enum WriteVersion {
     Legacy,
     WAL,
@@ -89,6 +90,7 @@ impl std::fmt::Display for WriteVersion {
 }
 
 
+#[derive(Debug)]
 pub enum ReadVersion {
     Legacy,
     WAL,
