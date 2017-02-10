@@ -5,6 +5,8 @@ pub enum ParserError {
     UnknownValue(u32),
 }
 
+
+#[derive(Debug)]
 pub enum TextEncoding {
     UTF8,
     UTF16le,
@@ -33,6 +35,7 @@ impl std::fmt::Display for TextEncoding {
 }
 
 
+#[derive(Debug)]
 pub enum SchemaFormat {
     Format1,
     Format2,
