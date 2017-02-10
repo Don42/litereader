@@ -10,7 +10,8 @@ use std::io::Cursor;
 
 use byteorder::{BigEndian, ReadBytesExt};
 
-use enums::{ReadVersion, WriteVersion, TextEncoding, SchemaFormat};
+use enums::{ReadVersion, WriteVersion, TextEncoding, SchemaFormat,
+            get_schema_format, get_text_encoding, get_write_version, get_read_version};
 
 const HEADER_STRING: &'static str = "SQLite format 3\0";
 const PAGE_SIZE_MAX: u32 = 65536;
@@ -52,7 +53,7 @@ pub struct SqliteHeader {
 impl std::fmt::Display for SqliteHeader {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f,
-"Page Size: {}
+               "Page Size: {}
 Read Version: {}
 Write Version: {}
 Reserved Space: {}
@@ -75,29 +76,29 @@ Version Valid For: {}
 SQLite Version Number: {}
 Valid: {}
 ",
-		self.page_size,
-		self.read_version,
-		self.write_version,
-		self.reserved_space,
-        self.max_embedded_payload_fraction,
-        self.min_embedded_payload_fraction,
-        self.leaf_payload_fraction,
-        self.file_change_counter,
-        self.database_size,
-        self.freelist_trunk_page,
-        self.freelist_count,
-        self.schema_cookie,
-        self.schema_format,
-        self.default_page_cache_size,
-        self.largest_root_page,
-        self.text_encoding,
-        self.user_version,
-        self.incremental_vacuum_mode,
-        self.application_id,
-        self.version_valid_for,
-        self.sqlite_version_number,
-		self.is_valid(),
-		)
+               self.page_size,
+               self.read_version,
+               self.write_version,
+               self.reserved_space,
+               self.max_embedded_payload_fraction,
+               self.min_embedded_payload_fraction,
+               self.leaf_payload_fraction,
+               self.file_change_counter,
+               self.database_size,
+               self.freelist_trunk_page,
+               self.freelist_count,
+               self.schema_cookie,
+               self.schema_format,
+               self.default_page_cache_size,
+               self.largest_root_page,
+               self.text_encoding,
+               self.user_version,
+               self.incremental_vacuum_mode,
+               self.application_id,
+               self.version_valid_for,
+               self.sqlite_version_number,
+               self.is_valid(),
+        )
     }
 }
 
@@ -122,42 +123,31 @@ impl Sqlite for SqliteHeader {
         // Parse everything here
         let magic = std::str::from_utf8(&buffer[0..16]).unwrap();
         assert_eq!(magic, HEADER_STRING);
-        let mut cur = Cursor::new(&buffer[24..]);
+        let mut cur = Cursor::new(&buffer[16..]);
         SqliteHeader {
             hdr: buffer.clone(),
             magic_string: magic.to_string(),
-            page_size: get_page_size(&buffer),
-            read_version: get_read_version(&buffer),
-            write_version: get_write_version(&buffer),
-            reserved_space: buffer[20],
-            max_embedded_payload_fraction: buffer[21],
-            min_embedded_payload_fraction: buffer[22],
-            leaf_payload_fraction: buffer[23],
+            page_size: get_page_size(cur.read_u16::<BigEndian>().unwrap()),
+            read_version: get_read_version(cur.read_u8().unwrap()).unwrap(),
+            write_version: get_write_version(cur.read_u8().unwrap()).unwrap(),
+            reserved_space: cur.read_u8().unwrap(),
+            max_embedded_payload_fraction: cur.read_u8().unwrap(),
+            min_embedded_payload_fraction: cur.read_u8().unwrap(),
+            leaf_payload_fraction: cur.read_u8().unwrap(),
             file_change_counter: cur.read_u32::<BigEndian>().unwrap(),
             database_size: cur.read_u32::<BigEndian>().unwrap(),
             freelist_trunk_page: cur.read_u32::<BigEndian>().unwrap(),
             freelist_count: cur.read_u32::<BigEndian>().unwrap(),
             schema_cookie: cur.read_u32::<BigEndian>().unwrap(),
-            schema_format: match cur.read_u32::<BigEndian>().unwrap() {
-                1 => SchemaFormat::Format1,
-                2 => SchemaFormat::Format2,
-                3 => SchemaFormat::Format3,
-                4 => SchemaFormat::Format4,
-                x => panic!("Unknown SchemaFormat {}", x),
-            },
+            schema_format: get_schema_format(cur.read_u32::<BigEndian>().unwrap()).unwrap(),
             default_page_cache_size: cur.read_u32::<BigEndian>().unwrap(),
             largest_root_page: cur.read_u32::<BigEndian>().unwrap(),
-            text_encoding: match cur.read_u32::<BigEndian>().unwrap() {
-                1 => TextEncoding::UTF8,
-                2 => TextEncoding::UTF16le,
-                3 => TextEncoding::UTF16be,
-                x => panic!("Unknown TextEncoding {}", x),
-            },
+            text_encoding: get_text_encoding(cur.read_u32::<BigEndian>().unwrap()).unwrap(),
             user_version: cur.read_u32::<BigEndian>().unwrap(),
             incremental_vacuum_mode: match cur.read_u32::<BigEndian>().unwrap() {
                 0 => false,
                 1 => true,
-                x => panic!("Unknwon incremental vacuum option: {}", x),
+                x => panic!("Unknown incremental vacuum option: {}", x),
             },
             application_id: cur.read_u32::<BigEndian>().unwrap(),
             reserved_area: {
@@ -172,37 +162,17 @@ impl Sqlite for SqliteHeader {
 
     fn is_valid(&self) -> bool {
         self.magic_string == HEADER_STRING && self.max_embedded_payload_fraction == 64 &&
-        self.min_embedded_payload_fraction == 32
+            self.min_embedded_payload_fraction == 32
     }
 }
 
 
-fn get_page_size(buffer: &[u8]) -> u32 {
-    let mut cur = Cursor::new(&buffer[16..18]);
-    let size = cur.read_u16::<BigEndian>().unwrap();
+fn get_page_size(size: u16) -> u32 {
     assert!(size.is_power_of_two());
     if size == 1 {
         PAGE_SIZE_MAX
     } else {
         size as u32
-    }
-}
-
-
-fn get_write_version(buffer: &[u8]) -> WriteVersion {
-    match buffer[18] {
-        1 => WriteVersion::Legacy,
-        2 => WriteVersion::WAL,
-        _ => panic!("Unknown WriteVersion"),
-    }
-}
-
-
-fn get_read_version(buffer: &[u8]) -> ReadVersion {
-    match buffer[19] {
-        1 => ReadVersion::Legacy,
-        2 => ReadVersion::WAL,
-        _ => panic!("Unknown WriteVersion"),
     }
 }
 
