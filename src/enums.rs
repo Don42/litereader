@@ -1,25 +1,11 @@
 extern crate std;
 
-#[derive(Debug)]
-pub enum ParserError {
-    UnknownValue(u32),
-}
-
 
 #[derive(Debug)]
 pub enum TextEncoding {
     UTF8,
     UTF16le,
     UTF16be,
-}
-
-pub fn get_text_encoding(val: u32) -> Result<TextEncoding, ParserError> {
-    match val {
-        1 => Ok(TextEncoding::UTF8),
-        2 => Ok(TextEncoding::UTF16le),
-        3 => Ok(TextEncoding::UTF16be),
-        x => Err(ParserError::UnknownValue(x)),
-    }
 }
 
 impl std::fmt::Display for TextEncoding {
@@ -43,16 +29,6 @@ pub enum SchemaFormat {
     Format4,
 }
 
-pub fn get_schema_format(val: u32) -> Result<SchemaFormat, ParserError> {
-    match val {
-        1 => Ok(SchemaFormat::Format1),
-        2 => Ok(SchemaFormat::Format2),
-        3 => Ok(SchemaFormat::Format3),
-        4 => Ok(SchemaFormat::Format4),
-        x => Err(ParserError::UnknownValue(x)),
-    }
-}
-
 impl std::fmt::Display for SchemaFormat {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f,
@@ -73,14 +49,6 @@ pub enum WriteVersion {
     WAL,
 }
 
-pub fn get_write_version(val: u8) -> Result<WriteVersion, ParserError> {
-    match val {
-        1 => Ok(WriteVersion::Legacy),
-        2 => Ok(WriteVersion::WAL),
-        x => Err(ParserError::UnknownValue(x as u32)),
-    }
-}
-
 impl std::fmt::Display for WriteVersion {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f,
@@ -97,14 +65,6 @@ impl std::fmt::Display for WriteVersion {
 pub enum ReadVersion {
     Legacy,
     WAL,
-}
-
-pub fn get_read_version(val: u8) -> Result<ReadVersion, ParserError> {
-    match val {
-        1 => Ok(ReadVersion::Legacy),
-        2 => Ok(ReadVersion::WAL),
-        x => Err(ParserError::UnknownValue(x as u32)),
-    }
 }
 
 impl std::fmt::Display for ReadVersion {

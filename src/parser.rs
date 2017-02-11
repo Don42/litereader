@@ -2,33 +2,17 @@
 use nom::{IResult, be_u16, be_u8, be_u32};
 
 use enums;
+use data_structures::Header;
 
 const HEADER_STRING: &'static str = "SQLite format 3\0";
 const PAGE_SIZE_MAX: u32 = 65536;
 
+
 #[derive(Debug)]
-pub struct Header {
-    pub page_size: u32,
-    pub read_version: enums::ReadVersion,
-    pub write_version: enums::WriteVersion,
-    pub reserved_space: u8,
-    pub max_embedded_payload_fraction: u8,
-    pub min_embedded_payload_fraction: u8,
-    pub leaf_payload_fraction: u8,
-    pub file_change_counter: u32,
-    pub database_size: u32,
-    pub freelist_trunk_page: u32,
-    pub freelist_count: u32,
-    pub schema_cookie: u32,
-    pub schema_format: enums::SchemaFormat,
-    pub default_page_cache_size: u32,
-    pub largest_root_page: u32,
-    pub text_encoding: enums::TextEncoding,
-    pub user_version: u32,
-    pub incremental_vacuum_mode: bool,
-    pub application_id: u32,
-    pub version_valid_for: u32,
-    pub sqlite_version: u32,
+pub enum ParserError {
+    UnknownValueU8(u8),
+    UnknownValueU16(u16),
+    UnknownValueU32(u32),
 }
 
 
@@ -87,35 +71,67 @@ named!(header_parser<Header>,
 named!(page_size_parser<u32>,
     map_res!(
         be_u16,
-        get_page_size
+        |x: u16| -> Result<u32, String> {
+            match x {
+                1 => Ok(PAGE_SIZE_MAX),
+                _ => Ok(x as u32),
+            }
+        }
     )
 );
 
 named!(read_version_parser<enums::ReadVersion>,
     map_res!(
         be_u8,
-        enums::get_read_version
+        |x: u8| -> Result<enums::ReadVersion, ParserError> {
+            match x {
+                1 => Ok(enums::ReadVersion::Legacy),
+                2 => Ok(enums::ReadVersion::WAL),
+                x => Err(ParserError::UnknownValueU8(x)),
+            }
+        }
     )
 );
 
 named!(write_version_parser<enums::WriteVersion>,
     map_res!(
         be_u8,
-        enums::get_write_version
+        |x: u8| -> Result<enums::WriteVersion, ParserError> {
+            match x {
+                1 => Ok(enums::WriteVersion::Legacy),
+                2 => Ok(enums::WriteVersion::WAL),
+                x => Err(ParserError::UnknownValueU8(x)),
+            }
+        }
     )
 );
 
 named!(schema_format_parser<enums::SchemaFormat>,
     map_res!(
         be_u32,
-        enums::get_schema_format
+        |x: u32| -> Result<enums::SchemaFormat, ParserError> {
+            match x {
+                1 => Ok(enums::SchemaFormat::Format1),
+                2 => Ok(enums::SchemaFormat::Format2),
+                3 => Ok(enums::SchemaFormat::Format3),
+                4 => Ok(enums::SchemaFormat::Format4),
+                x => Err(ParserError::UnknownValueU32(x)),
+            }
+        }
     )
 );
 
 named!(text_encoding_parser<enums::TextEncoding>,
     map_res!(
         be_u32,
-        enums::get_text_encoding
+        |x: u32| -> Result<enums::TextEncoding, ParserError> {
+            match x {
+                1 => Ok(enums::TextEncoding::UTF8),
+                2 => Ok(enums::TextEncoding::UTF16le),
+                3 => Ok(enums::TextEncoding::UTF16be),
+                x => Err(ParserError::UnknownValueU32(x)),
+            }
+        }
     )
 );
 
@@ -137,12 +153,4 @@ pub fn parse_header(buffer: &[u8]) -> Result<Header, String> {
         IResult::Error(_) => Err("Error".to_string()),
         IResult::Incomplete(_) => Err("Incomplete".to_string()),
     }
-}
-
-fn get_page_size(size: u16) -> Result<u32, String> {
-    Ok(if size == 1 {
-        PAGE_SIZE_MAX
-    } else {
-        size as u32
-    })
 }

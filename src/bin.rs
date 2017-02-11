@@ -1,8 +1,8 @@
 extern crate liblitereader;
 
-use liblitereader::{Sqlite};
+use liblitereader::{Sqlite, Header};
 
 fn main() {
-    let header = liblitereader::parser::Header::from_file("history.sqlite");
+    let header = Header::from_file("history.sqlite");
     println!("{:?}", header);
 }
