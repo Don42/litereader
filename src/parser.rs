@@ -2,7 +2,7 @@
 use nom::{IResult, be_u16, be_u8, be_u32};
 
 use enums;
-use data_structures::Header;
+use data_structures::{Header, BTreePageHeader, BTreePageType};
 
 const HEADER_STRING: &'static str = "SQLite format 3\0";
 const PAGE_SIZE_MAX: u32 = 65536;
@@ -146,9 +146,83 @@ named!(vacuum_mode_parser<bool>,
     )
 );
 
+named!(btree_page_header_parser<BTreePageHeader>,
+    chain!(
+        page_type: btree_page_type_parser ~
+        freeblock_offset: freeblock_offset_parser ~
+        cell_count: be_u16 ~
+        cell_content_offset: map_res!(
+            be_u16,
+            |x: u16| -> Result<u32, ParserError> {
+                match x {
+                    0 => Ok(65536),
+                    x => Ok(x as u32),
+                }
+            }
+        ) ~
+        fragmented_free_byte_count: be_u8 ~
+        right_most_pointer: apply!(parse_right_most_pointer, &page_type),
+
+        || BTreePageHeader {
+            page_type: page_type,
+            freeblock_offset: freeblock_offset,
+            cell_count: cell_count,
+            cell_content_offset: cell_content_offset,
+            fragmented_free_byte_count: 0,
+            right_most_pointer: right_most_pointer,
+        }
+    )
+);
+
+named!(freeblock_offset_parser<Option<u16>>,
+    map_res!(
+        be_u16,
+        |x: u16| -> Result<Option<u16>, ParserError> {
+            match x {
+                0 => Ok(None),
+                x => Ok(Some(x)),
+            }
+        }
+    )
+);
+
+named!(btree_page_type_parser<BTreePageType>,
+    map_res!(
+        be_u8,
+        |x: u8| {
+            match x {
+                0x02 => Ok(BTreePageType::InteriorIndexPage),
+                0x05 => Ok(BTreePageType::InteriorTablePage),
+                0x0a => Ok(BTreePageType::LeafIndexPage),
+                0x0d => Ok(BTreePageType::LeafTablePage),
+                x => Err(ParserError::UnknownValueU8(x)),
+            }
+        }
+    )
+);
+
+fn parse_right_most_pointer<'a>(i: &'a [u8], page_type: &BTreePageType)
+        -> IResult<&'a [u8], Option<u32>> {
+    match *page_type {
+        BTreePageType::InteriorIndexPage | BTreePageType::InteriorTablePage => {
+            do_parse!(i,
+                pointer: be_u32 >>
+                (Some(pointer)))
+        },
+        BTreePageType::LeafIndexPage | BTreePageType::LeafTablePage => IResult::Done(i, None)
+    }
+}
 
 pub fn parse_header(buffer: &[u8]) -> Result<Header, String> {
     match header_parser(buffer) {
+        IResult::Done(_, y) => Ok(y),
+        IResult::Error(_) => Err("Error".to_string()),
+        IResult::Incomplete(_) => Err("Incomplete".to_string()),
+    }
+}
+
+pub fn parse_btree_page_header(buffer: &[u8]) -> Result<BTreePageHeader, String> {
+    match btree_page_header_parser(buffer) {
         IResult::Done(_, y) => Ok(y),
         IResult::Error(_) => Err("Error".to_string()),
         IResult::Incomplete(_) => Err("Incomplete".to_string()),

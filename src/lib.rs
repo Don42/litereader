@@ -10,16 +10,16 @@ use std::io::prelude::Read;
 use std::path::Path;
 use std::error::Error;
 
-pub use data_structures::Header;
+pub use data_structures::{Header, BTreePageHeader};
 
 
-pub trait Sqlite<T> {
+pub trait Parser<T> {
     fn from_file(path: &str) -> T;
     fn from_vec(buffer: &Vec<u8>) -> T;
     fn is_valid(&self) -> bool;
 }
 
-impl Sqlite<Header> for Header {
+impl Parser<Header> for Header {
     fn from_file(path: &str) -> Header {
         let path = Path::new(path);
 
@@ -45,6 +45,36 @@ impl Sqlite<Header> for Header {
 
     fn is_valid(&self) -> bool {
         self.max_embedded_payload_fraction == 64 && self.min_embedded_payload_fraction == 32
+    }
+}
+
+
+impl Parser<BTreePageHeader> for BTreePageHeader {
+    fn from_file(path: &str) -> BTreePageHeader {
+        let path = Path::new(path);
+
+        let mut file = match File::open(&path) {
+            // The `description` method of `io::Error` returns a string that
+            // describes the error
+            Err(why) => panic!("couldn't open file {}", why.description()),
+            Ok(file) => file,
+        };
+
+        let mut buffer = Vec::<u8>::with_capacity(100);
+        let count = match file.read_to_end(&mut buffer) {
+            Ok(n) => n,
+            Err(why) => panic!("couldn't read header {}", why.description()),
+        };
+        assert!(count > 100);
+        BTreePageHeader::from_vec(&buffer)
+    }
+
+    fn from_vec(buffer: &Vec<u8>) -> BTreePageHeader {
+        parser::parse_btree_page_header(&buffer[100..]).unwrap()
+    }
+
+    fn is_valid(&self) -> bool {
+        unimplemented!()
     }
 }
 

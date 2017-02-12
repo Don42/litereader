@@ -26,3 +26,21 @@ pub struct Header {
     pub sqlite_version: u32,
 }
 
+
+#[derive(Debug)]
+pub enum BTreePageType {
+    InteriorIndexPage,
+    InteriorTablePage,
+    LeafIndexPage,
+    LeafTablePage,
+}
+
+#[derive(Debug)]
+pub struct BTreePageHeader {
+    pub page_type: BTreePageType,
+    pub freeblock_offset: Option<u16>,
+    pub cell_count: u16,
+    pub cell_content_offset: u32,
+    pub fragmented_free_byte_count: u8,
+    pub right_most_pointer: Option<u32>,
+}
