@@ -44,3 +44,14 @@ pub struct BTreePageHeader {
     pub fragmented_free_byte_count: u8,
     pub right_most_pointer: Option<u32>,
 }
+
+#[derive(Debug)]
+pub struct BTreePage {
+    pub header: BTreePageHeader,
+}
+
+#[derive(Debug)]
+pub struct SqliteFile {
+    pub header: Header,
+    pub pages: Vec<BTreePage>,
+}

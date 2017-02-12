@@ -1,8 +1,8 @@
 
-use nom::{IResult, be_u16, be_u8, be_u32};
+use nom::{IResult, be_u16, be_u8, be_u32, Needed};
 
 use enums;
-use data_structures::{Header, BTreePageHeader, BTreePageType};
+use data_structures::{Header, BTreePageHeader, BTreePageType, SqliteFile};
 
 const HEADER_STRING: &'static str = "SQLite format 3\0";
 const PAGE_SIZE_MAX: u32 = 65536;
@@ -14,6 +14,17 @@ pub enum ParserError {
     UnknownValueU16(u16),
     UnknownValueU32(u32),
 }
+
+named!(file_parser<SqliteFile>,
+    chain!(
+        header: header_parser ~
+        pages: many0!(be_u8),
+        || SqliteFile {
+            header: header,
+            pages: Vec::new(),
+        }
+    )
+);
 
 
 named!(header_parser<Header>,
@@ -201,6 +212,9 @@ named!(btree_page_type_parser<BTreePageType>,
     )
 );
 
+/*
+ * Parse the pointer for interior btree pages and skip for leaf pages
+ */
 fn parse_right_most_pointer<'a>(i: &'a [u8], page_type: &BTreePageType)
         -> IResult<&'a [u8], Option<u32>> {
     match *page_type {
@@ -210,6 +224,14 @@ fn parse_right_most_pointer<'a>(i: &'a [u8], page_type: &BTreePageType)
                 (Some(pointer)))
         },
         BTreePageType::LeafIndexPage | BTreePageType::LeafTablePage => IResult::Done(i, None)
+    }
+}
+
+pub fn parse_sqlite_file(i: &[u8]) -> Result<SqliteFile, String> {
+    match file_parser(i) {
+        IResult::Done(_, y) => Ok(y),
+        IResult::Error(_) => Err("Error".to_string()),
+        IResult::Incomplete(_) => Err("Incomplete".to_string()),
     }
 }
 

@@ -10,7 +10,7 @@ use std::io::prelude::Read;
 use std::path::Path;
 use std::error::Error;
 
-pub use data_structures::{Header, BTreePageHeader};
+pub use data_structures::{Header, BTreePageHeader, SqliteFile};
 
 
 pub trait Parser<T> {
@@ -48,6 +48,34 @@ impl Parser<Header> for Header {
     }
 }
 
+impl Parser<SqliteFile> for SqliteFile {
+    fn from_file(path: &str) -> SqliteFile {
+        let path = Path::new(path);
+
+        let mut file = match File::open(&path) {
+            // The `description` method of `io::Error` returns a string that
+            // describes the error
+            Err(why) => panic!("couldn't open file {}", why.description()),
+            Ok(file) => file,
+        };
+
+        let mut buffer = Vec::<u8>::with_capacity(100);
+        let count = match file.read_to_end(&mut buffer) {
+            Ok(n) => n,
+            Err(why) => panic!("couldn't read header {}", why.description()),
+        };
+        assert!(count > 100);
+        SqliteFile::from_vec(&buffer)
+    }
+
+    fn from_vec(buffer: &Vec<u8>) -> SqliteFile {
+        parser::parse_sqlite_file(&buffer).unwrap()
+    }
+
+    fn is_valid(&self) -> bool {
+        unimplemented!()
+    }
+}
 
 impl Parser<BTreePageHeader> for BTreePageHeader {
     fn from_file(path: &str) -> BTreePageHeader {

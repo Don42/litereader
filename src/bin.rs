@@ -1,10 +1,8 @@
 extern crate liblitereader;
 
-use liblitereader::{Parser, Header, BTreePageHeader};
+use liblitereader::{Parser, SqliteFile};
 
 fn main() {
-    let header = Header::from_file("history.sqlite");
-    println!("{:?}", header);
-    let page_header = BTreePageHeader::from_file("history.sqlite");
-    println!("{:?}", page_header);
+    let file = SqliteFile::from_file("history.sqlite");
+    println!("{:?}", file);
 }
