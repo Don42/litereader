@@ -33,6 +33,7 @@ pub enum BTreePageType {
     InteriorTablePage,
     LeafIndexPage,
     LeafTablePage,
+    NullPage,
 }
 
 #[derive(Debug,Copy,Clone)]

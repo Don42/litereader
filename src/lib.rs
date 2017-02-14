@@ -52,6 +52,7 @@ impl Parser<SqliteFile> for SqliteFile {
     fn from_file(path: &str) -> SqliteFile {
         let path = Path::new(path);
 
+        println!("Path: {:?}", path);
         let mut file = match File::open(&path) {
             // The `description` method of `io::Error` returns a string that
             // describes the error

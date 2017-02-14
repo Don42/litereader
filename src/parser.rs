@@ -153,20 +153,23 @@ named!(ignore_file_header<()>,
     )
 );
 
-named!(btree_page_parser<BTreePage>,
-    chain!(
-        opt!(ignore_file_header) ~
-        header: btree_page_header_parser ~
-        cell_pointer: count!(be_u16, header.cell_count as usize),
+named!(btree_page_parser<Option<BTreePage>>,
+    alt!(chain!(
+            tag!("\0\0"),
+            || None) |
+        chain!(
+            opt!(ignore_file_header) ~
+            header: btree_page_header_parser ~
+            cell_pointer: count!(be_u16, header.cell_count as usize),
         || {
                 // let mut cell_pointer = cell_pointer.clone();
                 // cell_pointer.sort();
-                BTreePage {
+                Some(BTreePage {
                 header: header,
                 cell_pointer: cell_pointer,
-                }
+                })
         }
-    )
+    ))
 );
 
 named!(btree_page_header_parser<BTreePageHeader>,
@@ -214,6 +217,7 @@ named!(btree_page_type_parser<BTreePageType>,
         be_u8,
         |x: u8| {
             match x {
+                0x00 => Ok(BTreePageType::NullPage),
                 0x02 => Ok(BTreePageType::InteriorIndexPage),
                 0x05 => Ok(BTreePageType::InteriorTablePage),
                 0x0a => Ok(BTreePageType::LeafIndexPage),
@@ -235,27 +239,50 @@ fn parse_right_most_pointer<'a>(i: &'a [u8], page_type: &BTreePageType)
                 pointer: be_u32 >>
                 (Some(pointer)))
         },
-        BTreePageType::LeafIndexPage | BTreePageType::LeafTablePage => IResult::Done(i, None)
+        BTreePageType::LeafIndexPage | BTreePageType::LeafTablePage => IResult::Done(i, None),
+        BTreePageType::NullPage => IResult::Done(i, None),
     }
 }
 
 pub fn parse_sqlite_file(i: &[u8]) -> Result<SqliteFile, String> {
-    let (o1, file_header) = match header_parser(i) {
+    let (_, file_header) = match header_parser(i) {
         IResult::Done(x, y) => (x, y),
-        IResult::Error(_) => {
-            return Err("Error".to_string())
+        IResult::Error(ErrorKind::Tag) => {
+            return Err("File is not SQLite Database".to_string())
         },
-        IResult::Incomplete(_) => { return Err("Incomplete".to_string()) },
-    };
-    let (o2, btree_page) = match btree_page_parser(o1) {
-        IResult::Done(x, y) => (x, y),
-        IResult::Error(_) => {
-            return Err("Error".to_string())
+        IResult::Error(x) => {
+            println!("{:?}", x);
+            return Err("Error parsing header".to_string())
         },
-        IResult::Incomplete(_) => { return Err("Incomplete".to_string()) },
+        IResult::Incomplete(_) => { return Err("Incomplete header".to_string()) },
     };
-    let mut page_list: Vec<BTreePage> = vec![btree_page.clone()];
-    for cell_pointer in btree_page.cell_pointer {
+    println!("{:?}", file_header);
+    let mut page_list: Vec<BTreePage> = vec![];
+    for page_id in 0..(file_header.database_size - 1) {
+        let start: usize = (page_id * file_header.page_size) as usize;
+        let end: usize = ((page_id + 1) * file_header.page_size) as usize;
+        let btree_page = match btree_page_parser(&i[start..end]) {
+            IResult::Done(_, Some(y)) => Some(y),
+            IResult::Done(_, None) => None,
+            IResult::Error(ErrorKind::MapRes) => {
+                println!("{} | MapRes | {:?}", page_id, &i[start..(start+8)]);
+                None
+            }
+            IResult::Error(e) => {
+                println!("{} | {}", page_id, e.description());
+                None
+            },
+            IResult::Incomplete(x) => {
+                println!("Incomplete {:?} {}: {:?}", &i[start..start+9], page_id, x);
+                return Err(format!("Incomplete {}: {:?}", page_id, x).to_string())
+            },
+        };
+        match btree_page {
+            Some(page) => page_list.push(page.clone()),
+            None => (),
+        }
+    }
+    /*for cell_pointer in btree_page.cell_pointer {
         let (cell_size, row_id) = match do_parse!(&i[cell_pointer as usize..],
             cell_size: parse_varint >>
             row_id: parse_varint >>
@@ -265,7 +292,7 @@ pub fn parse_sqlite_file(i: &[u8]) -> Result<SqliteFile, String> {
             IResult::Incomplete(_) => { return Err("Incomplete".to_string()) },
         };
         println!("{}_{}", cell_size, row_id);
-    };
+    };*/
 
     Ok(SqliteFile {
         header: file_header,
