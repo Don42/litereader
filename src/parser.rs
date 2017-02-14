@@ -1,8 +1,7 @@
-
-use nom::{IResult, be_u16, be_u8, be_u32, Needed};
+use nom::{IResult, be_u16, be_u8, be_u32, ErrorKind, Needed};
 
 use enums;
-use data_structures::{Header, BTreePageHeader, BTreePageType, SqliteFile};
+use data_structures::{Header, BTreePageHeader, BTreePageType, SqliteFile, BTreePage};
 
 const HEADER_STRING: &'static str = "SQLite format 3\0";
 const PAGE_SIZE_MAX: u32 = 65536;
@@ -14,17 +13,6 @@ pub enum ParserError {
     UnknownValueU16(u16),
     UnknownValueU32(u32),
 }
-
-named!(file_parser<SqliteFile>,
-    chain!(
-        header: header_parser ~
-        pages: many0!(be_u8),
-        || SqliteFile {
-            header: header,
-            pages: Vec::new(),
-        }
-    )
-);
 
 
 named!(header_parser<Header>,
@@ -157,6 +145,30 @@ named!(vacuum_mode_parser<bool>,
     )
 );
 
+named!(ignore_file_header<()>,
+    do_parse!(
+        tag!(HEADER_STRING) >>
+        take!(84) >>
+        ()
+    )
+);
+
+named!(btree_page_parser<BTreePage>,
+    chain!(
+        opt!(ignore_file_header) ~
+        header: btree_page_header_parser ~
+        cell_pointer: count!(be_u16, header.cell_count as usize),
+        || {
+                // let mut cell_pointer = cell_pointer.clone();
+                // cell_pointer.sort();
+                BTreePage {
+                header: header,
+                cell_pointer: cell_pointer,
+                }
+        }
+    )
+);
+
 named!(btree_page_header_parser<BTreePageHeader>,
     chain!(
         page_type: btree_page_type_parser ~
@@ -216,7 +228,7 @@ named!(btree_page_type_parser<BTreePageType>,
  * Parse the pointer for interior btree pages and skip for leaf pages
  */
 fn parse_right_most_pointer<'a>(i: &'a [u8], page_type: &BTreePageType)
-        -> IResult<&'a [u8], Option<u32>> {
+                                -> IResult<&'a [u8], Option<u32>> {
     match *page_type {
         BTreePageType::InteriorIndexPage | BTreePageType::InteriorTablePage => {
             do_parse!(i,
@@ -228,11 +240,37 @@ fn parse_right_most_pointer<'a>(i: &'a [u8], page_type: &BTreePageType)
 }
 
 pub fn parse_sqlite_file(i: &[u8]) -> Result<SqliteFile, String> {
-    match file_parser(i) {
-        IResult::Done(_, y) => Ok(y),
-        IResult::Error(_) => Err("Error".to_string()),
-        IResult::Incomplete(_) => Err("Incomplete".to_string()),
-    }
+    let (o1, file_header) = match header_parser(i) {
+        IResult::Done(x, y) => (x, y),
+        IResult::Error(_) => {
+            return Err("Error".to_string())
+        },
+        IResult::Incomplete(_) => { return Err("Incomplete".to_string()) },
+    };
+    let (o2, btree_page) = match btree_page_parser(o1) {
+        IResult::Done(x, y) => (x, y),
+        IResult::Error(_) => {
+            return Err("Error".to_string())
+        },
+        IResult::Incomplete(_) => { return Err("Incomplete".to_string()) },
+    };
+    let mut page_list: Vec<BTreePage> = vec![btree_page.clone()];
+    for cell_pointer in btree_page.cell_pointer {
+        let (cell_size, row_id) = match do_parse!(&i[cell_pointer as usize..],
+            cell_size: parse_varint >>
+            row_id: parse_varint >>
+            (cell_size, row_id)) {
+            IResult::Done(x, y) => y,
+            IResult::Error(_) => { return Err("Error".to_string()) },
+            IResult::Incomplete(_) => { return Err("Incomplete".to_string()) },
+        };
+        println!("{}_{}", cell_size, row_id);
+    };
+
+    Ok(SqliteFile {
+        header: file_header,
+        pages: page_list,
+    })
 }
 
 pub fn parse_header(buffer: &[u8]) -> Result<Header, String> {
@@ -248,5 +286,35 @@ pub fn parse_btree_page_header(buffer: &[u8]) -> Result<BTreePageHeader, String>
         IResult::Done(_, y) => Ok(y),
         IResult::Error(_) => Err("Error".to_string()),
         IResult::Incomplete(_) => Err("Incomplete".to_string()),
+    }
+}
+
+fn parse_varint(i: &[u8]) -> IResult<&[u8], u64> {
+    let mut content: u64 = 0;
+    let mut count: usize = 0;
+    for &c in i {
+        if count < 8 {
+            content <<= 7;
+            content += (c & 0x7Fu8) as u64
+        } else {
+            content <<= 8;
+            content += c as u64;
+        }
+        if (0x80u8 & c) == 0 || count == 8 {
+            return IResult::Done(&i[count..], content);
+        }
+        count += 1;
+    }
+    return IResult::Incomplete(Needed::Size(9 - count))
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn parser_it_works() {
+        let buffer: [u8; 16] = [0x81, 0x3e, 0x05, 0x07, 0x17, 0x29, 0x29, 0x01, 0x82,
+            0x37, 0x74, 0x61, 0x62, 0x6c, 0x65, 0x6f];
+        let (i, res) = super::parse_varint(&buffer).unwrap();
+        assert_eq!(190, res);
     }
 }

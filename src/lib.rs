@@ -98,7 +98,7 @@ impl Parser<BTreePageHeader> for BTreePageHeader {
     }
 
     fn from_vec(buffer: &Vec<u8>) -> BTreePageHeader {
-        parser::parse_btree_page_header(&buffer[100..]).unwrap()
+        parser::parse_btree_page_header(&buffer).unwrap()
     }
 
     fn is_valid(&self) -> bool {

@@ -1,7 +1,7 @@
 
 use enums;
 
-#[derive(Debug)]
+#[derive(Debug,Copy,Clone)]
 pub struct Header {
     pub page_size: u32,
     pub read_version: enums::ReadVersion,
@@ -27,7 +27,7 @@ pub struct Header {
 }
 
 
-#[derive(Debug)]
+#[derive(Debug,Copy,Clone)]
 pub enum BTreePageType {
     InteriorIndexPage,
     InteriorTablePage,
@@ -35,7 +35,7 @@ pub enum BTreePageType {
     LeafTablePage,
 }
 
-#[derive(Debug)]
+#[derive(Debug,Copy,Clone)]
 pub struct BTreePageHeader {
     pub page_type: BTreePageType,
     pub freeblock_offset: Option<u16>,
@@ -45,9 +45,10 @@ pub struct BTreePageHeader {
     pub right_most_pointer: Option<u32>,
 }
 
-#[derive(Debug)]
+#[derive(Debug,Clone)]
 pub struct BTreePage {
     pub header: BTreePageHeader,
+    pub cell_pointer: Vec<u16>,
 }
 
 #[derive(Debug)]

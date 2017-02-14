@@ -1,7 +1,7 @@
 extern crate std;
 
 
-#[derive(Debug)]
+#[derive(Debug,Copy,Clone)]
 pub enum TextEncoding {
     UTF8,
     UTF16le,
@@ -21,7 +21,7 @@ impl std::fmt::Display for TextEncoding {
 }
 
 
-#[derive(Debug)]
+#[derive(Debug,Copy,Clone)]
 pub enum SchemaFormat {
     Format1,
     Format2,
@@ -43,7 +43,7 @@ impl std::fmt::Display for SchemaFormat {
 }
 
 
-#[derive(Debug)]
+#[derive(Debug,Copy,Clone)]
 pub enum WriteVersion {
     Legacy,
     WAL,
@@ -61,7 +61,7 @@ impl std::fmt::Display for WriteVersion {
 }
 
 
-#[derive(Debug)]
+#[derive(Debug,Copy,Clone)]
 pub enum ReadVersion {
     Legacy,
     WAL,
