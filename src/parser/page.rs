@@ -3,6 +3,8 @@ use nom::{IResult, be_u16, be_u8, be_u32};
 use parser::{HEADER_STRING, ParserError};
 use data_structures::{BTreePageHeader, BTreePageType, BTreePage};
 
+const CONTENT_OFFSET_MAX: u32 = 65536;
+
 pub fn btree_page_header_parser(i: &[u8]) -> IResult<&[u8], BTreePageHeader> {
     chain!(i,
         page_type: btree_page_type_parser ~
@@ -12,7 +14,7 @@ pub fn btree_page_header_parser(i: &[u8]) -> IResult<&[u8], BTreePageHeader> {
             be_u16,
             |x: u16| -> Result<u32, ParserError> {
                 match x {
-                    0 => Ok(65536),
+                    0 => Ok(CONTENT_OFFSET_MAX),
                     x => Ok(x as u32),
                 }
             }
