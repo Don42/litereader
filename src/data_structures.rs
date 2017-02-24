@@ -55,5 +55,14 @@ pub struct BTreePage {
 #[derive(Debug)]
 pub struct SqliteFile {
     pub header: Header,
-    pub pages: Vec<BTreePage>,
+    buffer: Vec<u8>,
+}
+
+impl SqliteFile {
+    pub fn new(header: Header, buffer: Vec<u8>) -> SqliteFile {
+        SqliteFile {
+            header: header,
+            buffer: buffer,
+        }
+    }
 }

@@ -4,8 +4,8 @@ mod page;
 
 use nom::{IResult, ErrorKind};
 
-use data_structures::{Header, BTreePageHeader, SqliteFile, BTreePage};
-use parser::header::header_parser;
+use data_structures::{Header, BTreePageHeader};
+pub use parser::header::header_parser;
 use parser::page::{btree_page_parser, btree_page_header_parser};
 
 const HEADER_STRING: &'static str = "SQLite format 3\0";
@@ -18,7 +18,7 @@ pub enum ParserError {
     UnknownValueU32(u32),
 }
 
-
+/*
 pub fn parse_sqlite_file(i: &[u8]) -> Result<SqliteFile, String> {
     let (_, file_header) = match header_parser(i) {
         IResult::Done(x, y) => (x, y),
@@ -71,9 +71,9 @@ pub fn parse_sqlite_file(i: &[u8]) -> Result<SqliteFile, String> {
 
     Ok(SqliteFile {
         header: file_header,
-        pages: page_list,
+        buffer: i.to_vec(),
     })
-}
+}*/
 
 pub fn parse_header(buffer: &[u8]) -> Result<Header, String> {
     match header_parser(buffer) {
