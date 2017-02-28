@@ -70,9 +70,52 @@ impl SqliteFile {
 
 impl std::fmt::Display for Header {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f,
-               "{:?}",
-               self
+        write!(
+            f,
+            "Header {{ \
+            page_size: {}, \
+            read_version: {}, \
+            write_version: {}, \
+            reserved_space: {}, \
+            max_embedded_payload_fraction: {}, \
+            min_embedded_payload_fraction: {}, \
+            leaf_payload_fraction: {}, \
+            file_change_counter: {}, \
+            database_size: {}, \
+            freelist_trunk_page: {}, \
+            freelist_count: {}, \
+            schema_cookie: {}, \
+            schema_format: {}, \
+            default_page_cache_size: {}, \
+            largest_root_page: {}, \
+            text_encoding: {}, \
+            user_version: {}, \
+            incremental_vacuum_mode: {}, \
+            application_id: {}, \
+            version_valid_for: {}, \
+            sqlite_version: {} \
+            }}",
+            self.page_size,
+            self.read_version,
+            self.write_version,
+            self.reserved_space,
+            self.max_embedded_payload_fraction,
+            self.min_embedded_payload_fraction,
+            self.leaf_payload_fraction,
+            self.file_change_counter,
+            self.database_size,
+            self.freelist_trunk_page,
+            self.freelist_count,
+            self.schema_cookie,
+            self.schema_format,
+            self.default_page_cache_size,
+            self.largest_root_page,
+            self.text_encoding,
+            self.user_version,
+            self.incremental_vacuum_mode,
+            self.application_id,
+            self.version_valid_for,
+            self.sqlite_version,
         )
     }
 }
@@ -131,10 +174,10 @@ mod tests {
             freelist_trunk_page: 0, \
             freelist_count: 0, \
             schema_cookie: 15, \
-            schema_format: Format1, \
+            schema_format: 1, \
             default_page_cache_size: 1000000000, \
             largest_root_page: 0, \
-            text_encoding: UTF8, \
+            text_encoding: UTF-8, \
             user_version: 123123, \
             incremental_vacuum_mode: true, \
             application_id: 111111, \
